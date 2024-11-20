@@ -91,7 +91,7 @@ vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -120,6 +120,13 @@ end)
 
 -- Enable break indent
 vim.opt.breakindent = true
+
+-- Indent configuration
+vim.opt.expandtab = true
+vim.opt.tabstop = 4
+vim.opt.softtabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.smartindent = true
 
 -- Save undo history
 vim.opt.undofile = true
@@ -466,6 +473,19 @@ require('lazy').setup({
 
       -- Allows extra capabilities provided by nvim-cmp
       'hrsh7th/cmp-nvim-lsp',
+
+      -- Java LSP plugin
+      'mfussenegger/nvim-jdtls',
+
+      -- package Config files
+      {
+        url = 'chrislic@git.amazon.com:pkg/NinjaHooks',
+        branch = 'mainline',
+        lazy = false,
+        config = function(plugin)
+          vim.opt.rtp:prepend(plugin.dir .. '/configuration/vim/amazon/brazil-config')
+        end,
+      },
     },
     config = function()
       -- Brief aside: **What is LSP?**
@@ -589,13 +609,16 @@ require('lazy').setup({
       })
 
       -- Change diagnostic symbols in the sign column (gutter)
-      -- if vim.g.have_nerd_font then
-      --   local signs = { Error = '', Warn = '', Hint = '', Info = '' }
-      --   for type, icon in pairs(signs) do
-      --     local hl = 'DiagnosticSign' .. type
-      --     vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = hl })
-      --   end
-      -- end
+      if vim.g.have_nerd_font then
+        local signs = { Error = '', Warn = '', Hint = '', Info = '' }
+        for type, icon in pairs(signs) do
+          local hl = 'DiagnosticSign' .. type
+          vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = hl })
+        end
+      end
+
+      local configs = require 'lspconfig.configs'
+      local lspconfig = require 'lspconfig'
 
       -- LSP servers and clients are able to communicate to each other what features they support.
       --  By default, Neovim doesn't support everything that is in the LSP specification.
@@ -656,6 +679,7 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'jdtls',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -669,8 +693,29 @@ require('lazy').setup({
             server.capabilities = vim.tbl_deep_extend('force', {}, capabilities, server.capabilities or {})
             require('lspconfig')[server_name].setup(server)
           end,
+          ['jdtls'] = function() end,
         },
       }
+
+      -- package Config file setup
+      vim.filetype.add {
+        filename = {
+          ['Config'] = function()
+            vim.b.brazil_package_Config = 1
+            return 'brazil-config'
+          end,
+        },
+      }
+      configs.barium = {
+        default_config = {
+          cmd = { 'barium' },
+          filetypes = { 'brazil-config' },
+          root_dir = function(fname)
+            return lspconfig.util.find_git_ancestor(fname)
+          end,
+        },
+      }
+      lspconfig.barium.setup {}
     end,
   },
 
@@ -839,6 +884,7 @@ require('lazy').setup({
     --
     -- If you want to see what colorschemes are already installed, you can use `:Telescope colorscheme`.
     'folke/tokyonight.nvim',
+    lazy = false,
     priority = 1000, -- Make sure to load this before all the other start plugins.
     init = function()
       -- Load the colorscheme here.
@@ -887,6 +933,11 @@ require('lazy').setup({
         return '%2l:%-2v'
       end
 
+      -- Comment lines
+      -- - gc   - Toggle comment (Normal and Visual mode)
+      -- - gcc  - Toggle comment on current line
+      require('mini.comment').setup()
+
       -- ... and there is more!
       --  Check out: https://github.com/echasnovski/mini.nvim
     end,
@@ -929,15 +980,15 @@ require('lazy').setup({
   -- require 'kickstart.plugins.debug',
   -- require 'kickstart.plugins.indent_line',
   -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.neo-tree',
   -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
-  -- { import = 'custom.plugins' },
+  { import = 'custom.plugins' },
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
   -- Or use telescope!
